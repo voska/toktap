@@ -1,0 +1,34 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck
+    - errorlint
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - gosec
+    - misspell
+    - unconvert
+
+  settings:
+    gosec:
+      excludes:
+        - G304
+        - G706
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

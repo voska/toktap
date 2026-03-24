@@ -1,0 +1,12 @@
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates
+
+COPY toktap /usr/local/bin/toktap
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=2s --timeout=1s --start-period=1s --retries=2 \
+  CMD wget -qO- http://localhost:8080/healthz || exit 1
+
+ENTRYPOINT ["toktap"]

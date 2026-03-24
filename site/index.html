@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth" style="color-scheme:dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>toktap — Track LLM token usage across providers</title>
+  <meta name="description" content="toktap is a transparent LLM API proxy that tracks token usage across Anthropic, OpenAI, OpenRouter, and xAI. Writes to InfluxDB, ships with Grafana. ~0.1ms overhead.">
+  <meta name="keywords" content="LLM proxy, token usage, API monitoring, Claude Code, Codex CLI, InfluxDB, Grafana, AI observability, Go">
+  <link rel="canonical" href="https://toktap.co">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#0c0c0e">
+  <meta name="author" content="Matt Voska">
+  <meta property="og:title" content="toktap — Track LLM token usage across providers">
+  <meta property="og:description" content="Transparent proxy that taps LLM API streams. Writes to InfluxDB, ships with Grafana. ~0.1ms overhead.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://toktap.co">
+  <meta property="og:site_name" content="toktap">
+  <meta property="og:image" content="https://toktap.co/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="toktap — Track LLM token usage across providers">
+  <meta name="twitter:description" content="Transparent proxy that taps LLM API streams. Writes to InfluxDB, ships with Grafana.">
+  <meta name="twitter:image" content="https://toktap.co/og.png">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230c0c0e'/><text x='16' y='21' text-anchor='middle' font-family='monospace' font-size='11' font-weight='700' fill='%23f59e0b'>tt</text></svg>" type="image/svg+xml">
+  <link rel="llms" href="/llms.txt" type="text/plain">
+
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"SoftwareApplication","name":"toktap","description":"Transparent LLM API proxy that tracks token usage across providers and writes metrics to InfluxDB.","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Docker","softwareVersion":"0.1.0","license":"https://opensource.org/licenses/MIT","url":"https://toktap.co","codeRepository":"https://github.com/voska/toktap","programmingLanguage":"Go","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"voska","url":"https://github.com/voska"}}
+  </script>
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is toktap?","acceptedAnswer":{"@type":"Answer","text":"toktap is an open-source transparent LLM API proxy written in Go. It sits between your AI tools and the provider API, extracts token usage from SSE streams without modifying the response, and writes metrics to InfluxDB for visualization in Grafana."}},{"@type":"Question","name":"How much latency does toktap add?","acceptedAnswer":{"@type":"Answer","text":"Approximately 0.1ms per request. On a typical Claude Opus response that takes 5-30 seconds, that is less than 0.001% added latency."}},{"@type":"Question","name":"How do I set up toktap?","acceptedAnswer":{"@type":"Answer","text":"Clone the repo and run docker compose up -d. This starts toktap, InfluxDB, and Grafana with a pre-loaded dashboard. Then set ANTHROPIC_BASE_URL=http://localhost:8080/anthropic and your tokens are being tracked."}}]}
+  </script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+          },
+          colors: {
+            amber: { 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' },
+            bg: { DEFAULT: '#0c0c0e', raised: '#131316', card: '#17171a', border: '#232329' },
+            txt: { DEFAULT: '#e4e4e7', muted: '#71717a', dim: '#52525b' },
+          },
+        },
+      },
+    }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    body { background: #0c0c0e; font-family: 'Inter', system-ui, sans-serif; }
+    .hero-glow { background: radial-gradient(ellipse 60% 40% at 50% -10%, rgba(245, 158, 11, 0.07), transparent); }
+
+    .term { background: #131316; border: 1px solid #232329; border-radius: 10px; overflow: hidden; position: relative; }
+    .term-bar { background: #17171a; padding: 8px 14px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #232329; }
+    .term-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .term-body { padding: 20px; overflow-x: auto; }
+
+    .term-bar { position: relative; }
+    .copy-btn {
+      position: absolute; top: 50%; right: 10px; transform: translateY(-50%);
+      background: transparent; border: none; border-radius: 4px;
+      padding: 4px; cursor: pointer; color: #52525b;
+      opacity: 0; transition: opacity 0.15s, color 0.15s;
+    }
+    .term:hover .copy-btn { opacity: 1; }
+    .copy-btn:hover { color: #e4e4e7; }
+    .copy-btn:focus-visible { opacity: 1; outline: 2px solid #f59e0b; outline-offset: 2px; }
+    .copy-btn.copied { color: #4ade80; }
+
+    .s-prompt { color: #f59e0b; }
+    .s-cmd { color: #e4e4e7; }
+    .s-flag { color: #a78bfa; }
+    .s-str { color: #67e8f9; }
+    .s-key { color: #fb923c; }
+    .s-dim { color: #52525b; }
+    .s-ok { color: #4ade80; }
+    .s-val { color: #fbbf24; }
+
+    .flow-active { stroke: #f59e0b; stroke-width: 1.5; stroke-dasharray: 6 4; animation: dash 1.5s linear infinite; }
+    @keyframes dash { to { stroke-dashoffset: -20; } }
+
+    .sfade { opacity: 0; transform: translateY(16px); transition: opacity 0.5s ease-out, transform 0.5s ease-out; }
+    .sfade.v { opacity: 1; transform: translateY(0); }
+
+    .divider { height: 1px; background: linear-gradient(to right, transparent, #232329, transparent); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .sfade { opacity: 1; transform: none; transition: none; }
+      .flow-active { animation: none; }
+    }
+  </style>
+</head>
+<body class="text-txt antialiased">
+
+  <!-- Skip link -->
+  <a href="#start" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:bg-amber-500 focus:text-bg focus:px-4 focus:py-2 focus:rounded-md focus:z-[100] focus:text-sm focus:font-semibold">Skip to content</a>
+
+  <!-- Nav -->
+  <nav class="fixed top-0 inset-x-0 z-50 border-b border-bg-border" style="backdrop-filter:blur(12px);background:rgba(12,12,14,0.85)">
+    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="#" class="font-mono font-bold text-lg text-amber-500 tracking-tight">toktap</a>
+      <div class="flex items-center gap-5 text-sm">
+        <a href="https://github.com/voska/toktap" class="text-txt-muted hover:text-txt transition-colors flex items-center gap-1.5">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>
+          GitHub
+        </a>
+        <a id="version-pill" href="https://github.com/voska/toktap/releases/latest" class="font-mono text-xs text-amber-500/70 hover:text-amber-400 transition-colors">v0.1.0</a>
+        <a href="#start" class="bg-amber-500 text-bg font-semibold px-4 py-1.5 rounded-md text-xs hover:bg-amber-400 transition-colors">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero-glow pt-32 pb-12 sm:pt-40 sm:pb-16">
+    <div class="max-w-5xl mx-auto px-6">
+      <div class="max-w-3xl mb-10">
+        <h1 class="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1] mb-6" style="text-wrap:balance">
+          Track your token usage across <span class="text-amber-500">every provider</span>
+        </h1>
+        <p class="text-lg text-txt-muted max-w-xl leading-relaxed">
+          toktap is a proxy that sits between your AI tools and provider APIs. It pulls token usage out of SSE streams and writes it to InfluxDB. Nothing gets buffered, nothing gets modified. Your tools don&rsquo;t know it&rsquo;s there.
+        </p>
+      </div>
+
+      <!-- Inline stats -->
+      <div class="flex flex-wrap gap-x-6 gap-y-1 text-xs sm:text-sm mb-10 font-mono">
+        <span><span class="font-bold text-amber-400" style="font-variant-numeric:tabular-nums">0.1ms</span> <span class="text-txt-dim">overhead</span></span>
+        <span class="text-bg-border hidden sm:inline">|</span>
+        <span><span class="font-bold" style="font-variant-numeric:tabular-nums">0</span> <span class="text-txt-dim">bytes buffered</span></span>
+        <span class="text-bg-border hidden sm:inline">|</span>
+        <span><span class="font-bold" style="font-variant-numeric:tabular-nums">2.7K</span> <span class="text-txt-dim">LOC</span></span>
+        <span class="text-bg-border hidden sm:inline">|</span>
+        <span><span class="font-bold" style="font-variant-numeric:tabular-nums">4</span> <span class="text-txt-dim">deps</span></span>
+      </div>
+
+      <div class="flex items-center gap-3 mb-16">
+        <a href="#start" class="bg-amber-500 text-bg font-semibold px-6 py-2.5 rounded-md text-sm hover:bg-amber-400 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500">Get Started</a>
+        <a href="https://github.com/voska/toktap" class="border border-bg-border text-txt-muted font-medium px-6 py-2.5 rounded-md text-sm hover:border-txt-dim hover:text-txt transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500">View Source</a>
+      </div>
+
+      <!-- Dashboard -->
+      <div class="sfade">
+        <div class="term">
+          <div class="term-bar">
+            <div class="term-dot" style="background:#f85149"></div>
+            <div class="term-dot" style="background:#fbbf24"></div>
+            <div class="term-dot" style="background:#4ade80"></div>
+            <span class="text-xs text-txt-dim ml-2 font-mono">Grafana &mdash; toktap</span>
+          </div>
+          <img src="dashboard.png"
+               alt="toktap Grafana dashboard showing token usage, model mix, cache efficiency, and burn rate"
+               width="2554" height="2064"
+               class="w-full h-auto" loading="lazy" decoding="async">
+        </div>
+        <p class="text-sm text-txt-dim mt-3">
+          The dashboard ships pre-loaded. Usage by provider, model, device, and harness. All data in InfluxDB, so you can build whatever views you want.
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <div class="divider max-w-5xl mx-auto"></div>
+
+  <!-- Why -->
+  <section class="max-w-5xl mx-auto px-6 py-16 sfade">
+    <div class="max-w-2xl">
+      <h2 class="text-sm font-mono text-amber-500 mb-6 uppercase tracking-wider">Why</h2>
+      <blockquote class="border-l-2 border-amber-500/60 pl-5 mb-8">
+        <p class="text-xl font-medium leading-relaxed">&ldquo;You have to use tokens aggressively to create something remarkable. You have to let it rip.&rdquo;</p>
+        <cite class="text-sm text-txt-muted not-italic mt-3 block">&mdash; <a href="https://x.com/garrytan/status/1904984898382610636" class="text-amber-500/80 hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500">Garry Tan</a></cite>
+      </blockquote>
+      <div class="space-y-4 text-txt-muted leading-relaxed">
+        <p>Provider dashboards show API usage, but not aggregated token consumption across providers, devices, or tools. They don&rsquo;t show when you&rsquo;re productive or how usage breaks down across your setup.</p>
+        <p>toktap gives you that visibility. Not to cut back, but to make sure every token is doing real work.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider max-w-5xl mx-auto"></div>
+
+  <!-- How it works -->
+  <section class="max-w-5xl mx-auto px-6 py-16 sfade">
+    <h2 class="text-sm font-mono text-amber-500 mb-4 uppercase tracking-wider">How it works</h2>
+    <p class="text-txt-muted mb-12 max-w-xl">It&rsquo;s a proxy. Requests go through it, responses come back through it, and it pulls token counts out of the stream on the way back.</p>
+
+    <div class="max-w-3xl mb-14">
+      <svg viewBox="0 0 700 180" class="w-full" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Architecture: Your Tools to toktap to Provider API, with InfluxDB receiving usage data">
+        <rect x="10" y="50" width="140" height="80" rx="8" fill="#131316" stroke="#232329"/>
+        <text x="80" y="82" text-anchor="middle" fill="#e4e4e7" font-size="13" font-weight="600">Your Tools</text>
+        <text x="80" y="100" text-anchor="middle" fill="#71717a" font-size="10">Claude Code, Codex</text>
+
+        <rect x="260" y="50" width="120" height="80" rx="8" fill="#131316" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="320" y="82" text-anchor="middle" fill="#f59e0b" font-size="14" font-weight="700">toktap</text>
+        <text x="320" y="100" text-anchor="middle" fill="#71717a" font-size="9">tap / extract / write</text>
+
+        <rect x="490" y="50" width="140" height="80" rx="8" fill="#131316" stroke="#232329"/>
+        <text x="560" y="82" text-anchor="middle" fill="#e4e4e7" font-size="13" font-weight="600">Provider API</text>
+        <text x="560" y="100" text-anchor="middle" fill="#71717a" font-size="10">Anthropic, OpenAI, &hellip;</text>
+
+        <rect x="287" y="155" width="66" height="20" rx="4" fill="#131316" stroke="#232329"/>
+        <text x="320" y="169" text-anchor="middle" fill="#71717a" font-size="9">InfluxDB</text>
+
+        <line x1="150" y1="82" x2="257" y2="82" class="flow-active"/>
+        <polygon points="254,78 254,86 261,82" fill="#f59e0b" opacity="0.8"/>
+        <line x1="150" y1="98" x2="257" y2="98" stroke="#232329" stroke-width="1" stroke-dasharray="4 3" opacity="0.4"/>
+        <line x1="380" y1="82" x2="487" y2="82" class="flow-active"/>
+        <polygon points="484,78 484,86 491,82" fill="#f59e0b" opacity="0.8"/>
+        <line x1="380" y1="98" x2="487" y2="98" stroke="#232329" stroke-width="1" stroke-dasharray="4 3" opacity="0.4"/>
+        <line x1="320" y1="130" x2="320" y2="153" class="flow-active"/>
+        <polygon points="316,150 324,150 320,156" fill="#f59e0b" opacity="0.8"/>
+      </svg>
+    </div>
+
+    <div class="grid sm:grid-cols-2 gap-x-12 gap-y-8 max-w-3xl">
+      <div>
+        <h3 class="text-sm font-semibold mb-2">Intercept</h3>
+        <p class="text-sm text-txt-muted leading-relaxed">Point your tools at toktap instead of the provider API directly. It forwards everything upstream. Same headers, same body, same API key.</p>
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold mb-2">Extract</h3>
+        <p class="text-sm text-txt-muted leading-relaxed">When the response streams back, toktap reads the SSE events and pulls out token usage. It doesn&rsquo;t buffer the response or change anything. Your tools get the exact same bytes.</p>
+      </div>
+      <div class="sm:col-span-2">
+        <h3 class="text-sm font-semibold mb-2">Write</h3>
+        <p class="text-sm text-txt-muted leading-relaxed max-w-lg">Token counts, model, provider, device, harness. All written to InfluxDB async. Query it in Grafana or however you want.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider max-w-5xl mx-auto"></div>
+
+  <!-- Providers -->
+  <section class="max-w-5xl mx-auto px-6 py-16 sfade" aria-label="Provider configuration">
+    <h2 class="text-sm font-mono text-amber-500 mb-4 uppercase tracking-wider">Providers</h2>
+    <p class="text-txt-muted mb-8 max-w-lg">Every route is defined in <code class="font-mono text-xs text-txt-dim">routes.yaml</code>. Upstream URL, provider name, a couple of optional flags. Need another one? Add a few lines and reload.</p>
+    <div class="max-w-xl">
+      <div class="term" aria-label="routes.yaml configuration example">
+        <div class="term-bar">
+          <div class="term-dot" style="background:#f85149"></div>
+          <div class="term-dot" style="background:#fbbf24"></div>
+          <div class="term-dot" style="background:#4ade80"></div>
+          <span class="text-xs text-txt-dim ml-2 font-mono">deploy/config/routes.yaml</span>
+          <button class="copy-btn" aria-label="Copy configuration" onclick="copyBlock(this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg></button>
+        </div>
+        <div class="term-body">
+          <pre class="font-mono text-sm leading-7"><span class="s-key">routes:</span>
+  <span class="s-key">anthropic:</span>
+    <span class="s-dim">upstream:</span> <span class="s-str">https://api.anthropic.com</span>
+    <span class="s-dim">provider:</span> <span class="s-str">anthropic</span>
+
+  <span class="s-key">openai:</span>
+    <span class="s-dim">upstream:</span> <span class="s-str">https://api.openai.com</span>
+    <span class="s-dim">provider:</span> <span class="s-str">openai</span>
+    <span class="s-dim">inject_stream_options:</span> <span class="s-val">true</span>
+
+  <span class="s-key">openrouter:</span>
+    <span class="s-dim">upstream:</span> <span class="s-str">https://openrouter.ai</span>
+    <span class="s-dim">provider:</span> <span class="s-str">openrouter</span>
+    <span class="s-dim">inject_stream_options:</span> <span class="s-val">true</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider max-w-5xl mx-auto"></div>
+
+  <!-- Get Started -->
+  <section id="start" class="max-w-5xl mx-auto px-6 py-16 sfade" aria-label="Installation instructions">
+    <h2 class="text-sm font-mono text-amber-500 mb-8 uppercase tracking-wider">Get started</h2>
+    <div class="max-w-2xl space-y-8">
+      <div>
+        <p class="font-medium text-sm mb-3">1. Start toktap</p>
+        <div class="term" aria-label="Installation commands">
+          <div class="term-bar">
+            <div class="term-dot" style="background:#f85149"></div>
+            <div class="term-dot" style="background:#fbbf24"></div>
+            <div class="term-dot" style="background:#4ade80"></div>
+            <button class="copy-btn" aria-label="Copy commands" onclick="copyBlock(this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg></button>
+          </div>
+          <div class="term-body py-3">
+            <pre class="font-mono text-sm"><span class="s-dim"># with docker compose (includes InfluxDB + Grafana)</span>
+<span class="s-prompt">$</span> <span class="s-cmd">git clone</span> <span class="s-str">https://github.com/voska/toktap</span> <span class="s-flag">&&</span> <span class="s-cmd">cd</span> toktap
+<span class="s-prompt">$</span> <span class="s-cmd">docker compose up</span> <span class="s-flag">-d</span>
+
+<span class="s-dim"># or standalone (bring your own InfluxDB)</span>
+<span class="s-prompt">$</span> <span class="s-cmd">docker run</span> <span class="s-flag">-p 8080:8080</span> \
+    <span class="s-flag">-e</span> <span class="s-key">INFLUXDB_URL</span>=<span class="s-str">http://host:8086</span> \
+    <span class="s-str">ghcr.io/voska/toktap</span></pre>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="font-medium text-sm mb-3">2. Point your tools at it</p>
+        <div class="term" aria-label="Environment variable configuration">
+          <div class="term-bar">
+            <div class="term-dot" style="background:#f85149"></div>
+            <div class="term-dot" style="background:#fbbf24"></div>
+            <div class="term-dot" style="background:#4ade80"></div>
+            <button class="copy-btn" aria-label="Copy environment variables" onclick="copyBlock(this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg></button>
+          </div>
+          <div class="term-body py-3">
+            <pre class="font-mono text-sm"><span class="s-dim"># Claude Code</span>
+<span class="s-prompt">$</span> <span class="s-cmd">export</span> <span class="s-key">ANTHROPIC_BASE_URL</span>=<span class="s-str">http://localhost:8080/anthropic</span>
+
+<span class="s-dim"># Codex CLI</span>
+<span class="s-prompt">$</span> <span class="s-cmd">export</span> <span class="s-key">OPENAI_BASE_URL</span>=<span class="s-str">http://localhost:8080/openai/v1</span></pre>
+          </div>
+        </div>
+        <p class="text-xs text-txt-dim mt-2">One env var per provider. Your API keys don&rsquo;t change.</p>
+      </div>
+      <div>
+        <p class="font-medium text-sm mb-1">3. Open <a href="http://localhost:3000" class="text-amber-500 hover:text-amber-400 font-mono text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500">localhost:3000</a></p>
+        <p class="text-xs text-txt-dim">Your usage is being tracked.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Proxy support -->
+  <section class="max-w-5xl mx-auto px-6 pb-16 sfade">
+    <p class="text-xs text-txt-dim leading-relaxed max-w-lg">
+      Anthropic and OpenAI both support custom base URLs in their SDKs. So do Claude Code, Codex CLI, and anything built on them. Set <code class="font-mono">ANTHROPIC_BASE_URL</code> or <code class="font-mono">OPENAI_BASE_URL</code> and everything routes through toktap.
+    </p>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-bg-border py-8">
+    <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <a href="https://github.com/voska/toktap" class="font-mono font-bold text-amber-500 hover:text-amber-400 transition-colors text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500">toktap</a>
+      <div class="flex items-center gap-6 text-xs text-txt-muted">
+        <a href="https://github.com/voska/toktap" class="hover:text-txt transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500">GitHub</a>
+        <a href="https://github.com/voska/toktap/releases" class="hover:text-txt transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500">Releases</a>
+        <span>MIT License</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Scroll reveal
+    const obs = new IntersectionObserver(
+      (entries) => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('v'); obs.unobserve(e.target); } }),
+      { threshold: 0.1 }
+    );
+    document.querySelectorAll('.sfade').forEach(el => obs.observe(el));
+
+    // Version badge — fetch latest release from GitHub
+    fetch('https://api.github.com/repos/voska/toktap/releases/latest')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const el = document.getElementById('version-pill');
+        if (d && d.tag_name && el) { el.textContent = d.tag_name; el.classList.remove('hidden'); }
+      })
+      .catch(() => { document.getElementById('version-pill')?.classList.remove('hidden'); });
+
+    // Copy: reads text from the <pre> inside the same .term
+    async function copyBlock(btn) {
+      const term = btn.closest('.term');
+      const pre = term && term.querySelector('pre');
+      if (!pre) return;
+      const label = btn.getAttribute('aria-label');
+      try {
+        await navigator.clipboard.writeText(pre.textContent);
+        btn.classList.add('copied');
+        btn.setAttribute('aria-label', 'Copied');
+        setTimeout(() => { btn.classList.remove('copied'); btn.setAttribute('aria-label', label); }, 1500);
+      } catch {}
+    }
+  </script>
+</body>
+</html>

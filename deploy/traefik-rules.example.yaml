@@ -1,0 +1,16 @@
+http:
+  routers:
+    ai-proxy:
+      rule: "Host(`ai.example.com`) && PathPrefix(`/anthropic`, `/openai`, `/openrouter`, `/xai`)"
+      service: toktap
+      entrypoints:
+        - websecure
+      priority: 100
+    ai-dashboard:
+      rule: "Host(`ai.example.com`)"
+      service: grafana
+      entrypoints:
+        - websecure
+      middlewares:
+        - oidc-auth
+      priority: 1

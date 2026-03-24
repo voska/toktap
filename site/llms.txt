@@ -1,0 +1,16 @@
+# toktap
+
+> Transparent LLM API proxy that extracts token usage from SSE streams and writes metrics to InfluxDB. ~0.1ms overhead. Supports Anthropic, OpenAI, OpenRouter, xAI.
+
+## Docs
+
+- [README](https://github.com/voska/toktap/blob/master/README.md): Project overview, quick start, configuration, benchmarks
+- [CLAUDE.md](https://github.com/voska/toktap/blob/master/CLAUDE.md): Architecture, code layout, route config, technical details
+- [CHANGELOG](https://github.com/voska/toktap/blob/master/CHANGELOG.md): Release history
+
+## Links
+
+- Website: https://toktap.co
+- GitHub: https://github.com/voska/toktap
+- Releases: https://github.com/voska/toktap/releases
+- License: MIT

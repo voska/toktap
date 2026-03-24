@@ -1,0 +1,24 @@
+routes:
+  anthropic:
+    upstream: https://api.anthropic.com
+    provider: anthropic
+  openai:
+    upstream: https://api.openai.com
+    provider: openai
+    inject_stream_options: true
+  openrouter:
+    upstream: https://openrouter.ai
+    provider: openrouter
+    inject_stream_options: true
+  xai:
+    upstream: https://api.x.ai
+    provider: xai
+    inject_stream_options: true
+  chatgpt:
+    upstream: https://chatgpt.com/backend-api/codex
+    provider: openai
+    chrome_transport: true
+  openclaw:
+    upstream: https://chatgpt.com/backend-api
+    provider: openai
+    chrome_transport: true

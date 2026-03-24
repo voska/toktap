@@ -1,0 +1,38 @@
+# Environment and secrets
+.env
+*.env.local
+docker-compose.override.yaml
+docker-compose.override.yml
+
+# Database files
+*.sqlite
+*.db
+
+# Superpowers
+.superpowers/
+
+# Go
+vendor/
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Coverage
+*.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+.gstack/

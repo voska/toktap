@@ -1,0 +1,54 @@
+services:
+  toktap:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    environment:
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: toktap-dev-token
+      INFLUXDB_ORG: toktap
+      INFLUXDB_BUCKET: tokens
+      PRICING_CONFIG: /config/pricing.yaml
+      ROUTES_CONFIG: /config/routes.yaml
+    volumes:
+      - ./deploy/config:/config:ro
+    ports:
+      - "8080:8080"
+
+  influxdb:
+    image: influxdb:2
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: toktap-admin
+      DOCKER_INFLUXDB_INIT_ORG: toktap
+      DOCKER_INFLUXDB_INIT_BUCKET: tokens
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: toktap-dev-token
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+
+volumes:
+  influxdb_data:
