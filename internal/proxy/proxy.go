@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/voska/toktap/internal/pricing"
+	"github.com/voska/toktap/internal/recorder"
 	"github.com/voska/toktap/internal/sse"
 )
 
@@ -24,6 +26,7 @@ type Proxy struct {
 	writer          UsageWriter
 	pricing         *pricing.Table
 	chromeTransport http.RoundTripper
+	recorder        *recorder.Recorder
 }
 
 func New(routes map[string]*Route, writer UsageWriter, pricingTable *pricing.Table) *Proxy {
@@ -33,6 +36,10 @@ func New(routes map[string]*Route, writer UsageWriter, pricingTable *pricing.Tab
 		pricing:         pricingTable,
 		chromeTransport: NewChromeTransport(),
 	}
+}
+
+func (p *Proxy) SetRecorder(r *recorder.Recorder) {
+	p.recorder = r
 }
 
 // Headers to strip so they don't leak to upstream services.
@@ -73,11 +80,13 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = strings.TrimSuffix(route.Upstream.Path, "/") + r.URL.Path
 	}
 
+	var requestBody []byte
 	var requestBodyPreview string
 	if r.Method == "POST" && r.Body != nil && r.ContentLength != 0 {
 		body, err := io.ReadAll(r.Body)
 		_ = r.Body.Close()
 		if err == nil {
+			requestBody = body
 			requestBodyPreview = TruncateBody(body)
 			if route.InjectStreamOptions {
 				if modified, changed, _ := InjectStreamOptions(body); changed {
@@ -96,7 +105,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		transport = p.chromeTransport
 	}
 
-	record := func(usage sse.UsageData, statusCode int, streaming bool, respBodyPreview string) {
+	rec := p.recorder
+
+	record := func(usage sse.UsageData, statusCode int, streaming bool, respBodyPreview string, sseEvents []recorder.SSEEvent, respBody []byte) {
 		elapsed := time.Since(start).Milliseconds()
 		cost := p.calculateCost(usage)
 		p.writer.WriteUsage(usage, meta, cost, elapsed, statusCode, time.Now(), requestID)
@@ -124,6 +135,37 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ResponseBodyPreview: respBodyPreview,
 			IsStreaming:         streaming,
 		})
+
+		if rec != nil {
+			var reqJSON json.RawMessage
+			if json.Valid(requestBody) {
+				reqJSON = requestBody
+			}
+			var respJSON json.RawMessage
+			if len(respBody) > 0 && json.Valid(respBody) {
+				respJSON = respBody
+			}
+			rec.Write(recorder.Record{
+				ID:              requestID,
+				Timestamp:       start,
+				Provider:        meta.Provider,
+				Model:           usage.Model,
+				Device:          meta.Device,
+				Harness:         meta.Harness,
+				RequestPath:     routePath,
+				RequestMethod:   requestMethod,
+				RequestHeaders:  requestHeaders,
+				RequestBody:     reqJSON,
+				ResponseStatus:  statusCode,
+				ResponseHeaders: responseHeaders,
+				ResponseBody:    respJSON,
+				IsStreaming:     streaming,
+				SSEEvents:       sseEvents,
+				InputTokens:     usage.InputTokens,
+				OutputTokens:    usage.OutputTokens,
+				DurationMs:      elapsed,
+			})
+		}
 	}
 
 	rp := &httputil.ReverseProxy{
@@ -149,9 +191,15 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				(ct == "" && resp.StatusCode == 200)
 
 			if isSSE {
-				resp.Body = NewTapReader(resp.Body, route.Provider, func(usage sse.UsageData) {
-					record(usage, resp.StatusCode, true, "")
-				})
+				if rec != nil {
+					resp.Body = NewRecordingTapReader(resp.Body, route.Provider, func(usage sse.UsageData, events []recorder.SSEEvent) {
+						record(usage, resp.StatusCode, true, "", events, nil)
+					})
+				} else {
+					resp.Body = NewTapReader(resp.Body, route.Provider, func(usage sse.UsageData) {
+						record(usage, resp.StatusCode, true, "", nil, nil)
+					})
+				}
 			} else {
 				body, err := io.ReadAll(resp.Body)
 				_ = resp.Body.Close()
@@ -163,7 +211,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					log.Printf("non-streaming extraction failed [%s]: %v (body_len=%d)", route.Provider, extractErr, len(body))
 				}
 				if extractErr == nil {
-					record(usage, resp.StatusCode, false, TruncateBody(body))
+					record(usage, resp.StatusCode, false, TruncateBody(body), nil, body)
 				}
 				resp.Body = io.NopCloser(bytes.NewReader(body))
 			}

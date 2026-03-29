@@ -10,6 +10,7 @@ type Config struct {
 	PricingPath  string
 	RoutesPath   string
 	Port         string
+	RecorderPath string
 }
 
 func Load() Config {
@@ -21,6 +22,7 @@ func Load() Config {
 		PricingPath:  envOr("PRICING_CONFIG", "pricing.yaml"),
 		RoutesPath:   envOr("ROUTES_CONFIG", "routes.yaml"),
 		Port:         envOr("PORT", "8080"),
+		RecorderPath: envOr("RECORDER_PATH", ""),
 	}
 }
 

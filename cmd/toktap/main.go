@@ -15,6 +15,7 @@ import (
 	"github.com/voska/toktap/internal/influx"
 	"github.com/voska/toktap/internal/pricing"
 	"github.com/voska/toktap/internal/proxy"
+	"github.com/voska/toktap/internal/recorder"
 )
 
 var (
@@ -57,6 +58,16 @@ func main() {
 	defer writer.Close()
 
 	p := proxy.New(routes, writer, pricingTable)
+
+	if cfg.RecorderPath != "" {
+		rec, err := recorder.New(cfg.RecorderPath)
+		if err != nil {
+			log.Fatalf("creating recorder: %v", err)
+		}
+		defer rec.Close()
+		p.SetRecorder(rec)
+		log.Printf("recorder enabled: %s", cfg.RecorderPath)
+	}
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,

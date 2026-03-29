@@ -39,3 +39,12 @@ Adding a new route requires zero Go code — just a YAML entry.
 - **Chrome TLS:** Uses utls `HelloChrome_Auto` for providers behind Cloudflare Bot Management. Go's default JA3 fingerprint gets blocked.
 - **Metadata:** Device from `X-Device` header, harness from User-Agent, auth type from API key format
 - **Graceful shutdown:** SIGTERM drains in-flight connections (5 min timeout)
+
+## Recorder
+
+Optional conversation recording for training data collection. When `RECORDER_PATH` is set, toktap captures full request/response bodies as JSONL files (one per day).
+
+- **Non-streaming:** Full request and response JSON bodies are stored.
+- **SSE streaming:** All SSE events are captured via `RecordingTapReader`, which extends `TapReader` to buffer events alongside the existing zero-copy usage extraction.
+- **Storage:** Daily JSONL files at `$RECORDER_PATH/YYYY-MM-DD.jsonl`. Each line is a complete `recorder.Record` with request body, response body or SSE events, metadata, and token counts.
+- **Config:** Set `RECORDER_PATH=/data/recordings` to enable. Empty string (default) disables recording.
