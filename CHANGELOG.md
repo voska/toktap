@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.0
+
+- Conversation recording: capture full request/response bodies as daily JSONL files via `RECORDER_PATH`
+- SSE streaming responses captured through `RecordingTapReader` with full event buffering
+- Non-streaming responses stored as complete JSON bodies
+- AGENTS.md as canonical agent instructions (CLAUDE.md symlinks to it)
+- Site and llms.txt updated with recording documentation
+
 ## v0.1.0
 
 Initial release.
