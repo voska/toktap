@@ -18,12 +18,12 @@ func TestRecorderWritesJSONL(t *testing.T) {
 
 	ts := time.Date(2026, 3, 29, 12, 0, 0, 0, time.UTC)
 	rec.Write(Record{
-		ID:        "test-1",
-		Timestamp: ts,
-		Provider:  "anthropic",
-		Model:     "claude-opus-4-6",
+		ID:          "test-1",
+		Timestamp:   ts,
+		Provider:    "anthropic",
+		Model:       "claude-opus-4-6",
 		RequestBody: json.RawMessage(`{"messages":[{"role":"user","content":"hello"}]}`),
-		IsStreaming:  true,
+		IsStreaming: true,
 		SSEEvents: []SSEEvent{
 			{Type: "message_start", Data: `{"message":{"model":"claude-opus-4-6"}}`},
 			{Type: "content_block_delta", Data: `{"delta":{"text":"Hi"}}`},
