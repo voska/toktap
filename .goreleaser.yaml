@@ -38,6 +38,23 @@ changelog:
       - Merge pull request
       - Merge branch
 
+brews:
+  - name: toktap
+    homepage: "https://github.com/voska/toktap"
+    description: "Transparent proxy that taps LLM API traffic to extract token usage metrics"
+    license: "MIT"
+    repository:
+      owner: voska
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: voska-bot
+      email: bot@voska.dev
+    install: |
+      bin.install "toktap"
+    test: |
+      system "#{bin}/toktap", "--version"
+
 dockers:
   - image_templates:
       - "ghcr.io/voska/toktap:{{ .Version }}-amd64"
