@@ -1,20 +1,12 @@
-<p align="center">
-  <h1 align="center">toktap</h1>
-  <p align="center">
-    You can't optimize what you can't see.
-    <br />
-    <em>Track every token across every AI tool. ~0.1ms overhead.</em>
-  </p>
-  <p align="center">
-    <a href="https://github.com/voska/toktap/actions/workflows/ci.yml"><img src="https://github.com/voska/toktap/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-    <a href="https://goreportcard.com/report/github.com/voska/toktap"><img src="https://goreportcard.com/badge/github.com/voska/toktap" alt="Go Report Card"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
-  </p>
-</p>
+# toktap — Track every token across every AI tool
 
----
+[![CI](https://github.com/voska/toktap/actions/workflows/ci.yml/badge.svg)](https://github.com/voska/toktap/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/voska/toktap)](https://github.com/voska/toktap/releases)
+[![Go](https://img.shields.io/github/go-mod/go-version/voska/toktap)](https://go.dev/)
+[![Go Report Card](https://goreportcard.com/badge/github.com/voska/toktap)](https://goreportcard.com/report/github.com/voska/toktap)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-toktap is a transparent proxy that sits between your AI tools and the provider API. It extracts token usage from SSE streams — zero-copy, zero-buffering — and writes metrics to InfluxDB. Your tools don't know it's there.
+You can't optimize what you can't see. toktap is a transparent proxy that sits between your AI tools and provider APIs, extracts token usage from SSE streams -- zero-copy, zero-buffering -- and writes metrics to InfluxDB. Your tools don't know it's there. ~0.1ms overhead.
 
 ```
 ┌──────────────┐         ┌──────────┐         ┌──────────────┐
@@ -29,34 +21,35 @@ toktap is a transparent proxy that sits between your AI tools and the provider A
                          └──────────┘
 ```
 
-<p align="center">
-  <img src="docs/assets/dashboard.png" alt="toktap Grafana dashboard" width="100%" />
-</p>
+![toktap Grafana dashboard](docs/assets/dashboard.png)
 
-## Performance
+## Install
 
-toktap adds **~0.1ms** per request. A typical Claude Opus response takes 5-30 seconds — the proxy adds <0.001% latency. SSE streams are tapped zero-copy: bytes flow to the client while a side-channel scanner extracts usage.
+**Homebrew** (macOS / Linux):
 
-```
-BenchmarkDirectVsProxy/direct     63,530 ns/op
-BenchmarkDirectVsProxy/proxied   189,221 ns/op  ← ~0.13ms overhead
-BenchmarkSSEPayloadSizes/10       85,827 ns/op
-BenchmarkSSEPayloadSizes/100     117,435 ns/op
-BenchmarkSSEPayloadSizes/1000    375,794 ns/op
+```bash
+brew install voska/tap/toktap
 ```
 
-Run benchmarks yourself: `go test -bench=. -benchmem ./internal/proxy/`
-
-## Quick Start
+**Docker Compose** (includes InfluxDB + Grafana):
 
 ```bash
 git clone https://github.com/voska/toktap.git && cd toktap
 docker compose up -d
 ```
 
-That's it. InfluxDB, Grafana, and the proxy are all running. Open [localhost:3000](http://localhost:3000) for the dashboard.
+**Binary** (from source or [Releases](https://github.com/voska/toktap/releases)):
 
-Now point your tools at the proxy:
+```bash
+make build
+# binary at ./bin/toktap
+```
+
+## Quick Start
+
+If you used Docker Compose, everything is already running. Open [localhost:3000](http://localhost:3000) for the Grafana dashboard.
+
+Point your tools at the proxy:
 
 ```bash
 # Claude Code / Anthropic SDK
@@ -69,14 +62,16 @@ export OPENAI_BASE_URL=http://localhost:8080/openai/v1
 export ANTHROPIC_EXTRA_HEADERS="X-Device: macbook"
 ```
 
+Both [Anthropic](https://docs.anthropic.com/en/api/client-sdks) and [OpenAI](https://platform.openai.com/docs/api-reference) SDKs have built-in support for custom base URLs (`ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`), which is the mechanism toktap uses.
+
 ## Why
 
 > *"You have to use tokens aggressively to create something remarkable. You have to let it rip."*
-> — [Garry Tan](https://x.com/garrytan/status/1904984898382610636)
+> -- [Garry Tan](https://x.com/garrytan/status/1904984898382610636)
 
-I built toktap because provider dashboards only show API usage — not aggregated token consumption across providers, devices, or tools. They don't show me when I was productive or how my usage breaks down.
+I built toktap because provider dashboards only show API usage -- not aggregated token consumption across providers, devices, or tools. They don't show me when I was productive or how my usage breaks down.
 
-I have subscriptions with Anthropic and OpenAI. I don't want to use fewer tokens. I want to use more of them. But I want to see where they're going — not to cut back, but to make sure I'm actually putting them to work.
+I have subscriptions with Anthropic and OpenAI. I don't want to use fewer tokens. I want to use more of them. But I want to see where they're going -- not to cut back, but to make sure I'm actually putting them to work.
 
 If I'm only burning tokens 9 to 5, something's wrong.
 
@@ -126,12 +121,26 @@ Every request produces a structured JSON log and an InfluxDB data point:
 
 ## How It Works
 
-1. Request hits `/<route>/path` — route prefix is stripped, forwarded upstream
+1. Request hits `/<route>/path` -- route prefix is stripped, forwarded upstream
 2. **Streaming:** `TapReader` wraps the response body. Bytes flow to the client while a side-channel SSE scanner extracts usage events. Zero buffering, zero latency.
 3. **Non-streaming:** Response body is read once, usage extracted, original body forwarded
-4. Usage is written to InfluxDB asynchronously — the client never waits
+4. Usage is written to InfluxDB asynchronously -- the client never waits
 
 The proxy is invisible. Clients get the exact same bytes they'd get hitting the provider directly.
+
+## Performance
+
+toktap adds ~0.1ms per request. A typical Claude Opus response takes 5-30 seconds -- the proxy adds <0.001% latency. SSE streams are tapped zero-copy: bytes flow to the client while a side-channel scanner extracts usage.
+
+```
+BenchmarkDirectVsProxy/direct     63,530 ns/op
+BenchmarkDirectVsProxy/proxied   189,221 ns/op  <- ~0.13ms overhead
+BenchmarkSSEPayloadSizes/10       85,827 ns/op
+BenchmarkSSEPayloadSizes/100     117,435 ns/op
+BenchmarkSSEPayloadSizes/1000    375,794 ns/op
+```
+
+Run benchmarks yourself: `go test -bench=. -benchmem ./internal/proxy/`
 
 ## Cost Tracking
 
@@ -147,52 +156,36 @@ models:
     cache_creation_per_m: 18.75
 ```
 
-Pricing reloads every 60 seconds — update the file, no restart needed.
+Pricing reloads every 60 seconds -- update the file, no restart needed.
 
 ## Conversation Recording
 
-Optional. Set `RECORDER_PATH` to capture full request/response bodies as daily JSONL files — useful for building training datasets from your own AI usage.
+Optional. Set `RECORDER_PATH` to capture full request/response bodies as daily JSONL files -- useful for building training datasets from your own AI usage.
 
 ```bash
-# Enable via environment variable
 RECORDER_PATH=/data/recordings ./bin/toktap
-
-# Or in docker-compose.override.yaml
-services:
-  toktap:
-    environment:
-      RECORDER_PATH: /data/recordings
-    volumes:
-      - ./recordings:/data/recordings
 ```
 
-Each day produces a `YYYY-MM-DD.jsonl` file. Every line is a complete record with the full request body, full response body (or all SSE events for streaming responses), metadata, and token counts. Recordings are append-only and never modify the proxied traffic.
-
-When `RECORDER_PATH` is not set (default), recording is disabled and there is zero overhead.
+Each day produces a `YYYY-MM-DD.jsonl` file. Every line is a complete record with the full request body, full response body (or all SSE events for streaming responses), metadata, and token counts. Recordings are append-only and never modify the proxied traffic. When `RECORDER_PATH` is not set (default), recording is disabled and there is zero overhead.
 
 ## Deployment
 
 The default `docker-compose.yaml` includes InfluxDB and Grafana with a pre-loaded dashboard. For production, use a `docker-compose.override.yaml` to customize networking, memory limits, and reverse proxy labels.
 
-toktap is also a single static binary — run it standalone and point it at your own InfluxDB:
+toktap is also a single static binary -- run it standalone and point it at your own InfluxDB:
 
 ```bash
-make build
 INFLUXDB_URL=http://your-influxdb:8086 INFLUXDB_TOKEN=... ./bin/toktap
 ```
 
-Graceful shutdown on SIGTERM — in-flight SSE streams drain before exit (5 min timeout).
-
-## Proxy Support
-
-Both [Anthropic](https://docs.anthropic.com/en/api/client-sdks) and [OpenAI](https://platform.openai.com/docs/api-reference) SDKs have built-in support for custom base URLs (`ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`), which is the mechanism toktap uses.
+Graceful shutdown on SIGTERM -- in-flight SSE streams drain before exit (5 min timeout).
 
 ## Development
 
 ```bash
+make build   # build to bin/ with version embedding
 make test    # tests with race detector
 make lint    # golangci-lint
-make build   # build to bin/ with version embedding
 ```
 
 ## License
