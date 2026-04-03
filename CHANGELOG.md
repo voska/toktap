@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.0
+
+- WebSocket proxy support: transparent tunnel for `Upgrade: websocket` requests
+- Enables Codex CLI (Responses API) through toktap without code changes
+- Bidirectional `io.Copy` tunnel, no framing inspection, zero new dependencies
+- TLS connections force HTTP/1.1 ALPN to prevent h2 negotiation breaking WebSocket upgrades
+
 ## v0.2.0
 
 - Conversation recording: capture full request/response bodies as daily JSONL files via `RECORDER_PATH`

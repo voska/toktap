@@ -26,7 +26,7 @@
   <link rel="llms" href="/llms.txt" type="text/plain">
 
   <script type="application/ld+json">
-  {"@context":"https://schema.org","@type":"SoftwareApplication","name":"toktap","description":"Transparent LLM API proxy that tracks token usage across providers and writes metrics to InfluxDB.","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Docker","softwareVersion":"0.2.0","license":"https://opensource.org/licenses/MIT","url":"https://toktap.co","codeRepository":"https://github.com/voska/toktap","programmingLanguage":"Go","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"voska","url":"https://github.com/voska"}}
+  {"@context":"https://schema.org","@type":"SoftwareApplication","name":"toktap","description":"Transparent LLM API proxy that tracks token usage across providers and writes metrics to InfluxDB.","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Docker","softwareVersion":"0.3.0","license":"https://opensource.org/licenses/MIT","url":"https://toktap.co","codeRepository":"https://github.com/voska/toktap","programmingLanguage":"Go","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"voska","url":"https://github.com/voska"}}
   </script>
   <script type="application/ld+json">
   {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is toktap?","acceptedAnswer":{"@type":"Answer","text":"toktap is an open-source transparent LLM API proxy written in Go. It sits between your AI tools and the provider API, extracts token usage from SSE streams without modifying the response, and writes metrics to InfluxDB for visualization in Grafana."}},{"@type":"Question","name":"How much latency does toktap add?","acceptedAnswer":{"@type":"Answer","text":"Approximately 0.1ms per request. On a typical Claude Opus response that takes 5-30 seconds, that is less than 0.001% added latency."}},{"@type":"Question","name":"How do I set up toktap?","acceptedAnswer":{"@type":"Answer","text":"Clone the repo and run docker compose up -d. This starts toktap, InfluxDB, and Grafana with a pre-loaded dashboard. Then set ANTHROPIC_BASE_URL=http://localhost:8080/anthropic and your tokens are being tracked."}}]}
@@ -293,7 +293,12 @@
   <span class="s-key">openrouter:</span>
     <span class="s-dim">upstream:</span> <span class="s-str">https://openrouter.ai</span>
     <span class="s-dim">provider:</span> <span class="s-str">openrouter</span>
-    <span class="s-dim">inject_stream_options:</span> <span class="s-val">true</span></pre>
+    <span class="s-dim">inject_stream_options:</span> <span class="s-val">true</span>
+
+  <span class="s-key">chatgpt:</span>
+    <span class="s-dim">upstream:</span> <span class="s-str">https://chatgpt.com/backend-api/codex</span>
+    <span class="s-dim">provider:</span> <span class="s-str">openai</span>
+    <span class="s-dim">chrome_transport:</span> <span class="s-val">true</span></pre>
         </div>
       </div>
     </div>
@@ -339,8 +344,11 @@
             <pre class="font-mono text-sm"><span class="s-dim"># Claude Code</span>
 <span class="s-prompt">$</span> <span class="s-cmd">export</span> <span class="s-key">ANTHROPIC_BASE_URL</span>=<span class="s-str">http://localhost:8080/anthropic</span>
 
-<span class="s-dim"># Codex CLI</span>
-<span class="s-prompt">$</span> <span class="s-cmd">export</span> <span class="s-key">OPENAI_BASE_URL</span>=<span class="s-str">http://localhost:8080/openai/v1</span></pre>
+<span class="s-dim"># Codex CLI (API key)</span>
+<span class="s-prompt">$</span> <span class="s-cmd">export</span> <span class="s-key">OPENAI_BASE_URL</span>=<span class="s-str">http://localhost:8080/openai/v1</span>
+
+<span class="s-dim"># Codex CLI (ChatGPT OAuth) — ~/.codex/config.toml</span>
+<span class="s-key">base_url</span> = <span class="s-str">"http://localhost:8080/chatgpt"</span></pre>
           </div>
         </div>
         <p class="text-xs text-txt-dim mt-2">One env var per provider. Your API keys don&rsquo;t change.</p>
@@ -355,7 +363,7 @@
   <!-- Proxy support -->
   <section class="max-w-5xl mx-auto px-6 pb-16 sfade">
     <p class="text-xs text-txt-dim leading-relaxed max-w-lg">
-      Anthropic and OpenAI both support custom base URLs in their SDKs. So do Claude Code, Codex CLI, and anything built on them. Set <code class="font-mono">ANTHROPIC_BASE_URL</code> or <code class="font-mono">OPENAI_BASE_URL</code> and everything routes through toktap.
+      Anthropic and OpenAI both support custom base URLs in their SDKs. So do Claude Code, Codex CLI, and anything built on them. Set <code class="font-mono">ANTHROPIC_BASE_URL</code> or <code class="font-mono">OPENAI_BASE_URL</code> and everything routes through toktap. WebSocket connections (used by Codex CLI for the Responses API) are transparently tunneled.
     </p>
   </section>
 

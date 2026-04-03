@@ -58,11 +58,15 @@ export ANTHROPIC_BASE_URL=http://localhost:8080/anthropic
 # Codex CLI / OpenAI SDK
 export OPENAI_BASE_URL=http://localhost:8080/openai/v1
 
+# Codex CLI via config.toml (ChatGPT OAuth route)
+# ~/.codex/config.toml
+base_url = "http://localhost:8080/chatgpt"
+
 # Tag requests by machine (optional)
 export ANTHROPIC_EXTRA_HEADERS="X-Device: macbook"
 ```
 
-Both [Anthropic](https://docs.anthropic.com/en/api/client-sdks) and [OpenAI](https://platform.openai.com/docs/api-reference) SDKs have built-in support for custom base URLs (`ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`), which is the mechanism toktap uses.
+Both [Anthropic](https://docs.anthropic.com/en/api/client-sdks) and [OpenAI](https://platform.openai.com/docs/api-reference) SDKs have built-in support for custom base URLs (`ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`), which is the mechanism toktap uses. Codex CLI connects via WebSocket for the Responses API -- toktap transparently tunnels these connections alongside regular HTTP requests.
 
 ## Why
 
@@ -91,7 +95,7 @@ routes:
     provider: openai
     inject_stream_options: true   # get usage in streaming responses
 
-  codex:
+  chatgpt:
     upstream: https://chatgpt.com/backend-api/codex
     provider: openai
     chrome_transport: true        # Chrome TLS fingerprint for Cloudflare
@@ -124,7 +128,8 @@ Every request produces a structured JSON log and an InfluxDB data point:
 1. Request hits `/<route>/path` -- route prefix is stripped, forwarded upstream
 2. **Streaming:** `TapReader` wraps the response body. Bytes flow to the client while a side-channel SSE scanner extracts usage events. Zero buffering, zero latency.
 3. **Non-streaming:** Response body is read once, usage extracted, original body forwarded
-4. Usage is written to InfluxDB asynchronously -- the client never waits
+4. **WebSocket:** `Upgrade: websocket` requests are detected, the client connection is hijacked, and a bidirectional TCP tunnel is established to the upstream. Used by Codex CLI for the Responses API.
+5. Usage is written to InfluxDB asynchronously -- the client never waits
 
 The proxy is invisible. Clients get the exact same bytes they'd get hitting the provider directly.
 

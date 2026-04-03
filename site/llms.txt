@@ -1,6 +1,6 @@
 # toktap
 
-> Transparent LLM API proxy that extracts token usage from SSE streams and writes metrics to InfluxDB. Optional conversation recording for training data collection. ~0.1ms overhead. Supports Anthropic, OpenAI, OpenRouter, xAI.
+> Transparent LLM API proxy that extracts token usage from SSE streams and writes metrics to InfluxDB. Transparent WebSocket tunneling for Codex CLI (Responses API). Optional conversation recording for training data collection. ~0.1ms overhead. Supports Anthropic, OpenAI, OpenRouter, xAI.
 
 ## Docs
 

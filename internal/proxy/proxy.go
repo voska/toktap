@@ -80,6 +80,11 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = strings.TrimSuffix(route.Upstream.Path, "/") + r.URL.Path
 	}
 
+	if isWebSocketUpgrade(r) {
+		p.handleWebSocket(w, r, route)
+		return
+	}
+
 	var requestBody []byte
 	var requestBodyPreview string
 	if r.Method == "POST" && r.Body != nil && r.ContentLength != 0 {
