@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 )
 
 func TestIsWebSocketUpgrade(t *testing.T) {

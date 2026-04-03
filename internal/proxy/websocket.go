@@ -50,7 +50,7 @@ func (p *Proxy) handleWebSocket(w http.ResponseWriter, r *http.Request, route *R
 		http.Error(w, "upstream connect failed", http.StatusBadGateway)
 		return
 	}
-	defer upstream.Close()
+	defer func() { _ = upstream.Close() }()
 
 	// Rebuild the upgrade request for upstream.
 	var reqBuf strings.Builder
@@ -85,12 +85,12 @@ func (p *Proxy) handleWebSocket(w http.ResponseWriter, r *http.Request, route *R
 		log.Printf("websocket hijack [%s]: %v", route.Provider, err)
 		return
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Flush any buffered data from the hijacked reader to upstream.
-	if buf.Reader.Buffered() > 0 {
-		buffered := make([]byte, buf.Reader.Buffered())
-		if _, err := buf.Reader.Read(buffered); err == nil {
+	if n := buf.Reader.Buffered(); n > 0 {
+		buffered := make([]byte, n)
+		if _, err := buf.Read(buffered); err == nil {
 			_, _ = upstream.Write(buffered)
 		}
 	}
