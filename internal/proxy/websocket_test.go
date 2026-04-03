@@ -165,4 +165,3 @@ func startEchoUpgradeServer(t *testing.T) net.Listener {
 	}()
 	return ln
 }
-
