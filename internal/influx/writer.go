@@ -38,13 +38,12 @@ func NewWriter(url, token, org, bucket string) *Writer {
 
 func (w *Writer) WriteUsage(usage sse.UsageData, meta proxy.Metadata, costUSD float64, responseTimeMs int64, statusCode int, ts time.Time, requestID string) {
 	line := fmt.Sprintf(
-		"llm_usage,provider=%s,model=%s,device=%s,harness=%s,auth_type=%s,request_id=%s input_tokens=%di,output_tokens=%di,cache_read_tokens=%di,cache_creation_tokens=%di,cost_usd=%.6f,response_time_ms=%di,status_code=%di %d",
+		"llm_usage,provider=%s,model=%s,device=%s,harness=%s,auth_type=%s input_tokens=%di,output_tokens=%di,cache_read_tokens=%di,cache_creation_tokens=%di,cost_usd=%.6f,response_time_ms=%di,status_code=%di,request_id=\"%s\" %d",
 		escape(meta.Provider),
 		escape(usage.Model),
 		escape(meta.Device),
 		escape(meta.Harness),
 		escape(meta.AuthType),
-		escape(requestID),
 		usage.InputTokens,
 		usage.OutputTokens,
 		usage.CacheReadTokens,
@@ -52,6 +51,7 @@ func (w *Writer) WriteUsage(usage sse.UsageData, meta proxy.Metadata, costUSD fl
 		costUSD,
 		responseTimeMs,
 		statusCode,
+		escapeFieldString(requestID),
 		ts.UnixNano(),
 	)
 	w.api.WriteRecord(line)
@@ -66,6 +66,20 @@ func (w *Writer) Close() {
 	if w.client != nil {
 		w.client.Close()
 	}
+}
+
+func escapeFieldString(s string) string {
+	if s == "" {
+		return "unknown"
+	}
+	result := make([]byte, 0, len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] == '"' || s[i] == '\\' {
+			result = append(result, '\\')
+		}
+		result = append(result, s[i])
+	}
+	return string(result)
 }
 
 func escape(s string) string {

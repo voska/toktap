@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.1
+
+- Fix high-cardinality bug: `request_id` moved from InfluxDB tag to string field
+- Resolves Grafana query timeouts caused by ~100k unique series on `llm_usage` measurement
+- Existing series require manual cleanup (drop measurement or wait for retention)
+
 ## v0.3.0
 
 - WebSocket proxy support: transparent tunnel for `Upgrade: websocket` requests

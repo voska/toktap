@@ -53,7 +53,7 @@ func TestWriteUsage(t *testing.T) {
 		"model=claude-opus-4-6",
 		"device=raptor",
 		"harness=claude-code",
-		"request_id=test-request-id",
+		`request_id="test-request-id"`,
 		"input_tokens=100i",
 		"output_tokens=50i",
 		"cost_usd=0.058",
