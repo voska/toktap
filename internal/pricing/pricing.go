@@ -36,7 +36,8 @@ func LoadFromFile(path string) (*Table, error) {
 func (t *Table) Calculate(model string, input, output, cacheRead, cacheCreation int64) float64 {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	log.Printf("Original model name: '%s'", model)
+
+	realModelName := model
 
 	lastDash := strings.LastIndex(model, "-")
 	if lastDash != -1 {
@@ -50,7 +51,7 @@ func (t *Table) Calculate(model string, input, output, cacheRead, cacheCreation 
 		}
 	}
 
-	log.Printf("Model transformed to: '%s' for cost calculation", model)
+	log.Printf("Model name transformed from '%s' to '%s' for cost calculation", realModelName, model)
 
 	p, ok := t.Models[model]
 
