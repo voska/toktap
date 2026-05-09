@@ -11,6 +11,7 @@ type Config struct {
 	RoutesPath   string
 	Port         string
 	RecorderPath string
+	RecorderRetentionDays string
 }
 
 func Load() Config {
@@ -23,6 +24,7 @@ func Load() Config {
 		RoutesPath:   envOr("ROUTES_CONFIG", "routes.yaml"),
 		Port:         envOr("PORT", "8080"),
 		RecorderPath: envOr("RECORDER_PATH", ""),
+		RecorderRetentionDays: envOr("RECORDER_RETENTION_DAYS", "7"),
 	}
 }
 
