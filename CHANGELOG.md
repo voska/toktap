@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.5.1
+
+- Reverted to a Homebrew formula. Casks are macOS-only, so v0.5.0 silently dropped `brew install` support on Linux
+
 ## v0.5.0
 
 - Distributed as a Homebrew **cask** instead of a formula; `brew update` migrates existing installs automatically
