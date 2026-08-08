@@ -40,6 +40,7 @@ changelog:
 
 brews:
   - name: toktap
+    directory: Formula
     homepage: "https://github.com/voska/toktap"
     description: "Transparent proxy that taps LLM API traffic to extract token usage metrics"
     license: "MIT"

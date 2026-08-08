@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.4.0
+
+- Publish the Homebrew formula into `Formula/` in `voska/homebrew-tap` instead of the tap root, so `brew install voska/tap/toktap` resolves again
+
 ## v0.3.1
 
 - Fix high-cardinality bug: `request_id` moved from InfluxDB tag to string field
