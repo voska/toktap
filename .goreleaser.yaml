@@ -38,12 +38,14 @@ changelog:
       - Merge pull request
       - Merge branch
 
-brews:
+homebrew_casks:
   - name: toktap
-    directory: Formula
+    directory: Casks
     homepage: "https://github.com/voska/toktap"
     description: "Transparent proxy that taps LLM API traffic to extract token usage metrics"
     license: "MIT"
+    url:
+      verified: github.com/voska/toktap
     repository:
       owner: voska
       name: homebrew-tap
@@ -51,10 +53,12 @@ brews:
     commit_author:
       name: voska-bot
       email: bot@voska.dev
-    install: |
-      bin.install "toktap"
-    test: |
-      system "#{bin}/toktap", "--version"
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/toktap"]
+          end
 
 dockers:
   - image_templates:

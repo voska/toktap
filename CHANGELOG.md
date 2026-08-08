@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.5.0
+
+- Distributed as a Homebrew **cask** instead of a formula; `brew update` migrates existing installs automatically
+- goreleaser deprecated `brews` in v2.10 (hard since v2.16), so casks are the supported path
+
 ## v0.4.0
 
 - Publish the Homebrew formula into `Formula/` in `voska/homebrew-tap` instead of the tap root, so `brew install voska/tap/toktap` resolves again
