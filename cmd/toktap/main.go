@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"strconv"
 
 	"github.com/voska/toktap/internal/config"
 	"github.com/voska/toktap/internal/influx"
@@ -60,7 +61,18 @@ func main() {
 	p := proxy.New(routes, writer, pricingTable)
 
 	if cfg.RecorderPath != "" {
-		rec, err := recorder.New(cfg.RecorderPath)
+		//  convert retention days to hours for the recorder
+		retentionInHours := time.Duration(-1)
+		retentionDaysInt, _ := strconv.Atoi(cfg.RecorderRetentionDays)
+		if err == nil {
+			retentionDuration, _ := time.ParseDuration(strconv.FormatUint(uint64(retentionDaysInt * 24), 10) + "h")
+			retentionInHours = retentionDuration
+		}
+		if retentionInHours < 0 {
+			log.Printf("Recorder retention is disabled due to invalid retention duration: %s", cfg.RecorderRetentionDays)
+		}
+
+		rec, err := recorder.New(cfg.RecorderPath, retentionInHours)
 		if err != nil {
 			log.Fatalf("creating recorder: %v", err)
 		}

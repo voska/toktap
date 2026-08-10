@@ -38,16 +38,17 @@ type SSEEvent struct {
 
 type Recorder struct {
 	dir string
+	retentionHours time.Duration
 	mu  sync.Mutex
 	f   *os.File
 	day string
 }
 
-func New(dir string) (*Recorder, error) {
+func New(dir string, retentionHours time.Duration) (*Recorder, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, fmt.Errorf("creating recorder dir: %w", err)
 	}
-	return &Recorder{dir: dir}, nil
+	return &Recorder{dir: dir, retentionHours: retentionHours}, nil
 }
 
 func (r *Recorder) Write(rec Record) {
@@ -86,6 +87,28 @@ func (r *Recorder) ensureFile(day string) error {
 	}
 	r.f = f
 	r.day = day
+
+	// Clean up old files
+	files, _ := os.ReadDir(r.dir)
+	if r.retentionHours > 0 {
+		cutoff := time.Now().Add(-r.retentionHours)
+		for _, file := range files {
+			if file.IsDir() {
+				continue
+			}
+			name := file.Name()
+			if len(name) != len("2006-01-02.jsonl") || name[len(name)-6:] != ".jsonl" {
+				continue
+			}
+			t, err := time.Parse("2006-01-02", name[:10])
+			if err != nil {
+				continue
+			}
+			if t.Before(cutoff) {
+				_ = os.Remove(filepath.Join(r.dir, name))
+			}
+		}
+	}
 	return nil
 }
 
