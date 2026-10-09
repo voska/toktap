@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -15,13 +16,13 @@ import (
 // chatgpt.com / Cloudflare does).
 func NewChromeTransport() http.RoundTripper {
 	return &http2.Transport{
-		DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
+		DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
 			host, _, err := net.SplitHostPort(addr)
 			if err != nil {
 				host = addr
 			}
 
-			conn, err := net.Dial(network, addr)
+			conn, err := (&net.Dialer{}).DialContext(ctx, network, addr)
 			if err != nil {
 				return nil, err
 			}
@@ -30,7 +31,7 @@ func NewChromeTransport() http.RoundTripper {
 				ServerName: host,
 			}
 			tlsConn := utls.UClient(conn, config, utls.HelloChrome_Auto)
-			if err := tlsConn.Handshake(); err != nil {
+			if err := tlsConn.HandshakeContext(ctx); err != nil {
 				_ = conn.Close()
 				return nil, err
 			}
