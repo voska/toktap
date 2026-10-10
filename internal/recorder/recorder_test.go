@@ -10,7 +10,7 @@ import (
 
 func TestRecorderWritesJSONL(t *testing.T) {
 	dir := t.TempDir()
-	rec, err := New(dir)
+	rec, err := New(dir, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestRecorderWritesJSONL(t *testing.T) {
 
 func TestRecorderRotatesDaily(t *testing.T) {
 	dir := t.TempDir()
-	rec, err := New(dir)
+	rec, err := New(dir, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,5 +83,30 @@ func TestRecorderRotatesDaily(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(dir, day)); err != nil {
 			t.Errorf("missing file %s: %v", day, err)
 		}
+	}
+}
+
+func TestRecorderRetention(t *testing.T) {
+	dir := t.TempDir()
+	rec, err := New(dir, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rec.Close()
+
+	rec.Write(Record{
+		ID:        "day1",
+		Timestamp: time.Date(2026, 3, 28, 12, 0, 0, 0, time.UTC),
+	})
+	rec.Write(Record{
+		ID:        "day2",
+		Timestamp: time.Date(2026, 3, 29, 12, 0, 0, 0, time.UTC),
+	})
+
+	rec.Close()
+
+	deletedFileName := "2026-03-28.jsonl"
+	if _, err := os.Stat(filepath.Join(dir, deletedFileName)); err == nil {
+		t.Errorf("file %s should have been deleted due to retention policy", deletedFileName)
 	}
 }
