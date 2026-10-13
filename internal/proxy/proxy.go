@@ -175,9 +175,11 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	rp := &httputil.ReverseProxy{
 		Transport: transport,
-		Director: func(req *http.Request) {
+		Rewrite: func(preq *httputil.ProxyRequest) {
+			req := preq.Out
 			req.URL.Scheme = route.Upstream.Scheme
 			req.URL.Host = route.Upstream.Host
+			req.URL.RawQuery = preq.In.URL.RawQuery
 			req.Host = route.Upstream.Host
 			for _, h := range stripHeaders {
 				req.Header.Del(h)

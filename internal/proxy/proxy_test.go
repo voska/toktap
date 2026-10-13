@@ -224,6 +224,46 @@ func TestProxyUpstreamPathPrepended(t *testing.T) {
 	}
 }
 
+func TestProxyRewritePreservesUpstreamRequest(t *testing.T) {
+	const query = "model=a%2Fb&opaque=%ZZ&flag"
+	var upstreamHost string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/messages" || r.URL.RawQuery != query {
+			t.Errorf("upstream URL = %s, want /api/v1/messages?%s", r.URL, query)
+		}
+		if r.Host != upstreamHost {
+			t.Errorf("upstream host = %q, want %q", r.Host, upstreamHost)
+		}
+		for _, h := range stripHeaders {
+			if h == "Accept-Encoding" {
+				continue
+			}
+			if value := r.Header.Get(h); value != "" {
+				t.Errorf("upstream header %s = %q, want stripped", h, value)
+			}
+		}
+		if r.Header.Get("Authorization") != "Bearer synthetic-test-key" {
+			t.Error("authorization header was modified")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer upstream.Close()
+	upstreamHost = strings.TrimPrefix(upstream.URL, "http://")
+
+	p := New(testRoute(upstream.URL+"/api", "anthropic"), &mockWriter{}, nil)
+	req := httptest.NewRequest("GET", "/anthropic/v1/messages?"+query, nil)
+	for _, h := range stripHeaders {
+		req.Header.Set(h, "synthetic")
+	}
+	req.Header.Set("Authorization", "Bearer synthetic-test-key")
+	rec := httptest.NewRecorder()
+	p.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+}
+
 func TestProxySkipsStreamOptionsWhenNotConfigured(t *testing.T) {
 	var gotBody string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
