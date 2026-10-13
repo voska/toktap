@@ -173,6 +173,12 @@ RECORDER_PATH=/data/recordings ./bin/toktap
 
 Each day produces a `YYYY-MM-DD.jsonl` file. Every line is a complete record with the full request body, full response body (or all SSE events for streaming responses), metadata, and token counts. Recordings are append-only and never modify the proxied traffic. When `RECORDER_PATH` is not set (default), recording is disabled and there is zero overhead.
 
+Log file retention defaults to 7 days. Retention can be adjusted with `RECORDER_RETENTION_DAYS` env variable .i.e. to keep log files for 30 days, export
+
+```
+RECORDER_RETENTION_DAYS=30
+```
+
 ## Deployment
 
 The default `docker-compose.yaml` includes InfluxDB and Grafana with a pre-loaded dashboard. For production, use a `docker-compose.override.yaml` to customize networking, memory limits, and reverse proxy labels.

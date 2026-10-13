@@ -3,9 +3,8 @@ routes:
     upstream: https://api.anthropic.com
     provider: anthropic
   openai:
-    upstream: https://api.openai.com
+    upstream: https://api.openai.com/v1
     provider: openai
-    inject_stream_options: true
   openrouter:
     upstream: https://openrouter.ai
     provider: openrouter
