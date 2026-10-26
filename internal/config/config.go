@@ -19,8 +19,8 @@ func Load() Config {
 		InfluxToken:  envOr("INFLUXDB_TOKEN", ""),
 		InfluxOrg:    envOr("INFLUXDB_ORG", ""),
 		InfluxBucket: envOr("INFLUXDB_BUCKET", "tokens"),
-		PricingPath:  envOr("PRICING_CONFIG", "pricing.yaml"),
-		RoutesPath:   envOr("ROUTES_CONFIG", "routes.yaml"),
+		PricingPath:  configPath("PRICING_CONFIG", "pricing.yaml"),
+		RoutesPath:   configPath("ROUTES_CONFIG", "routes.yaml"),
 		Port:         envOr("PORT", "8080"),
 		RecorderPath: envOr("RECORDER_PATH", ""),
 	}
@@ -31,4 +31,14 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func configPath(key, name string) string {
+	if path := os.Getenv(key); path != "" {
+		return path
+	}
+	if _, err := os.Lstat(name); !os.IsNotExist(err) {
+		return name
+	}
+	return ""
 }

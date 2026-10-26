@@ -1,9 +1,9 @@
 package pricing
 
 import (
-	"os"
 	"sync"
 
+	defaults "github.com/voska/toktap/deploy/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -20,7 +20,7 @@ type Table struct {
 }
 
 func LoadFromFile(path string) (*Table, error) {
-	data, err := os.ReadFile(path)
+	data, err := defaults.ReadFile(path, "pricing.yaml")
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (t *Table) Calculate(model string, input, output, cacheRead, cacheCreation 
 }
 
 func (t *Table) Reload(path string) error {
-	data, err := os.ReadFile(path)
+	data, err := defaults.ReadFile(path, "pricing.yaml")
 	if err != nil {
 		return err
 	}
