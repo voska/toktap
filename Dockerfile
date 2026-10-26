@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}" \
     -o toktap ./cmd/toktap
 
-FROM alpine:3.19
+FROM alpine:3.24
 
 RUN apk add --no-cache ca-certificates
 

@@ -3,9 +3,9 @@ package proxy
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 
+	defaults "github.com/voska/toktap/deploy/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -24,7 +24,7 @@ type routeYAML struct {
 }
 
 func LoadRoutes(path string) (map[string]*Route, error) {
-	data, err := os.ReadFile(path)
+	data, err := defaults.ReadFile(path, "routes.yaml")
 	if err != nil {
 		return nil, fmt.Errorf("reading routes config: %w", err)
 	}

@@ -327,9 +327,13 @@
 <span class="s-dim"># or standalone (bring your own InfluxDB)</span>
 <span class="s-prompt">$</span> <span class="s-cmd">docker run</span> <span class="s-flag">-p 8080:8080</span> \
     <span class="s-flag">-e</span> <span class="s-key">INFLUXDB_URL</span>=<span class="s-str">http://host:8086</span> \
+    <span class="s-flag">-e</span> <span class="s-key">INFLUXDB_TOKEN</span>=<span class="s-str">your-token</span> \
+    <span class="s-flag">-e</span> <span class="s-key">INFLUXDB_ORG</span>=<span class="s-str">your-org</span> \
+    <span class="s-flag">-e</span> <span class="s-key">INFLUXDB_BUCKET</span>=<span class="s-str">tokens</span> \
     <span class="s-str">ghcr.io/voska/toktap</span></pre>
           </div>
         </div>
+        <p class="text-xs text-txt-dim mt-2">Standalone: <code class="font-mono">INFLUXDB_URL</code> must be reachable from inside the container (<code class="font-mono">localhost</code> there is the container itself). The bucket must already exist, and the token needs write permission for it.</p>
       </div>
       <div>
         <p class="font-medium text-sm mb-3">2. Point your tools at it</p>

@@ -22,7 +22,7 @@ archives:
     files:
       - README.md
       - LICENSE
-      - deploy/config/*
+      - deploy/config/*.yaml
 
 checksum:
   name_template: checksums.txt
@@ -55,6 +55,14 @@ brews:
       bin.install "toktap"
     test: |
       system "#{bin}/toktap", "--version"
+      port = free_port
+      pid = spawn({"PORT" => port.to_s}, "#{bin}/toktap")
+      begin
+        assert_equal "ok", shell_output("curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:#{port}/healthz")
+      ensure
+        Process.kill("TERM", pid)
+        Process.wait(pid)
+      end
 
 dockers:
   - image_templates:

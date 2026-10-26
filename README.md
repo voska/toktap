@@ -38,6 +38,19 @@ git clone https://github.com/voska/toktap.git && cd toktap
 docker compose up -d
 ```
 
+**Docker** (bring your own InfluxDB 2):
+
+```bash
+docker run -p 8080:8080 \
+    -e INFLUXDB_URL=http://host:8086 \
+    -e INFLUXDB_TOKEN=your-token \
+    -e INFLUXDB_ORG=your-org \
+    -e INFLUXDB_BUCKET=tokens \
+    ghcr.io/voska/toktap
+```
+
+Use an InfluxDB URL reachable from inside the container. The bucket must already exist, and the token needs write permission for it.
+
 **Binary** (from source or [Releases](https://github.com/voska/toktap/releases)):
 
 ```bash
@@ -48,6 +61,18 @@ make build
 ## Quick Start
 
 If you used Docker Compose, everything is already running. Open [localhost:3000](http://localhost:3000) for the Grafana dashboard.
+
+For Homebrew or a downloaded binary, start toktap with your InfluxDB 2 settings first:
+
+```bash
+INFLUXDB_URL=http://your-influxdb:8086 \
+INFLUXDB_TOKEN=your-token \
+INFLUXDB_ORG=your-org \
+INFLUXDB_BUCKET=tokens \
+toktap
+```
+
+The binary includes the default routes and pricing, so it starts from any directory without config files. An explicit `ROUTES_CONFIG` or `PRICING_CONFIG` path takes precedence; otherwise, a `routes.yaml` or `pricing.yaml` in the working directory overrides its embedded default. Missing or invalid explicit paths are reported rather than silently replaced.
 
 Point your tools at the proxy:
 
@@ -149,7 +174,7 @@ Run benchmarks yourself: `go test -bench=. -benchmem ./internal/proxy/`
 
 ## Cost Tracking
 
-Optional. Drop a pricing config and toktap calculates cost per request:
+The binary includes a default pricing table. To customize it, set `PRICING_CONFIG` to a YAML file:
 
 ```yaml
 # deploy/config/pricing.yaml
@@ -161,7 +186,7 @@ models:
     cache_creation_per_m: 18.75
 ```
 
-Pricing reloads every 60 seconds -- update the file, no restart needed.
+Custom pricing reloads every 60 seconds: update the file, no restart needed.
 
 ## Conversation Recording
 
@@ -180,7 +205,11 @@ The default `docker-compose.yaml` includes InfluxDB and Grafana with a pre-loade
 toktap is also a single static binary -- run it standalone and point it at your own InfluxDB:
 
 ```bash
-INFLUXDB_URL=http://your-influxdb:8086 INFLUXDB_TOKEN=... ./bin/toktap
+INFLUXDB_URL=http://your-influxdb:8086 \
+INFLUXDB_TOKEN=your-token \
+INFLUXDB_ORG=your-org \
+INFLUXDB_BUCKET=tokens \
+./bin/toktap
 ```
 
 Graceful shutdown on SIGTERM -- in-flight SSE streams drain before exit (5 min timeout).
