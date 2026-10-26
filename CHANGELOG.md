@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.5.3
+
+- Bundled default routes and pricing so standalone Docker and Homebrew installs start without config files
+- Config lookup order: explicit `ROUTES_CONFIG` / `PRICING_CONFIG` paths, working-directory `routes.yaml` / `pricing.yaml` files, then built-in defaults
+- Without a pricing file, `cost_usd` now uses the bundled pricing table for listed models instead of staying at zero; set `PRICING_CONFIG` to use your own prices
+- Standalone Docker instructions now include the InfluxDB 2 token, organization, and bucket settings
+- Both runtime images now use Alpine 3.24
+
+## v0.5.2
+
+- Patched `golang.org/x/crypto` and `golang.org/x/net` dependency vulnerabilities (#5)
+- Patched Go toolchain and dependency vulnerabilities (#6)
+
 ## v0.5.1
 
 - Reverted to a Homebrew formula. Casks are macOS-only, so v0.5.0 silently dropped `brew install` support on Linux
